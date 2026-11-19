@@ -191,6 +191,8 @@ Page({
     this.cloudTimer = null;
     this.cloudChain = null;
     this.cloudNotified = false;
+    this.syncBaseAt = this.state.updatedAt || 0;
+    this.localDirty = false;
 
     let statusBarHeight = 20;
     try {
@@ -204,11 +206,19 @@ Page({
     });
 
     this.state.remaining = this.validRemaining();
+    this.restorePending();
     this.applySeason(this.state.settings.season);
     this.refresh();
     this.syncStage();
     this.persistLocal();
     this.syncFromCloud();
+
+    if (wx.showShareMenu) {
+      wx.showShareMenu({
+        menus: ['shareAppMessage', 'shareTimeline'],
+        fail: function () {}
+      });
+    }
 
     if (!this.storageOK) {
       setTimeout(() => this.toast('本地存储不可用，本次数据不会保存'), 800);
@@ -231,6 +241,11 @@ Page({
       this.modalTimer = null;
       /* 弹框还没弹出就被切走：允许回到前台后点抽卡重新弹出 */
       this.modalVisible = false;
+    }
+    if (this.data.modalOpen) {
+      /* 弹框已弹出时切走：收起弹框，任务仍留在待完成队列里 */
+      this.modalVisible = false;
+      this.setData({ modalOpen: false });
     }
     if (this.data.toastShow || this.data.dockOpen) {
       this.setData({ toastShow: false, dockOpen: false });
@@ -280,6 +295,7 @@ Page({
 
   save() {
     this.state.updatedAt = Date.now();
+    this.localDirty = true;
     this.persistLocal();
     this.scheduleCloudSave();
   },
@@ -315,21 +331,24 @@ Page({
 
         this.cloudDocId = doc._id;
         const remoteAt = doc.updatedAt || 0;
-        const localAt = this.state.updatedAt || 0;
+        const baseAt = this.syncBaseAt || 0;
+        const busy = this.drawing || this.pending.length || this.currentCards.length;
 
-        if (remoteAt > localAt) {
-          /* 正在抽卡/翻牌时不覆盖，避免打断当前操作 */
-          if (this.drawing || this.pending.length || this.currentCards.length) {
-            this.pushToCloud();
-          } else {
+        if (remoteAt > baseAt) {
+          /* 云端比启动时更新：空闲且本地没有改动才直接采用，否则合并后回传，避免整条覆盖丢数据 */
+          if (!this.localDirty && !busy) {
             this.applyRemoteState(doc);
+          } else {
+            this.mergeRemoteState(doc);
+            this.pushToCloud();
           }
-        } else if (localAt > remoteAt) {
+        } else if (this.state.updatedAt > remoteAt) {
           this.pushToCloud();
         }
       })
-      .catch(() => {
+      .catch((err) => {
         this.cloudStatus = 'off';
+        this.logCloudError(err, 'read');
         this.notifyCloudError();
       });
   },
@@ -340,12 +359,60 @@ Page({
     this.state.remaining = this.validRemaining();
     this.roundDrawn = 0;
     this.currentCards = [];
-    this.pending = [];
     this.modalVisible = false;
+    this.restorePending();
     this.applySeason(this.state.settings.season);
     this.syncStage();
     this.refresh();
     this.persistLocal();
+  },
+
+  /* 合并云端与本地数据：只增不删，卡池按 id 去重，记录按 key 去重 */
+  mergeRemoteState(doc) {
+    const remote = normalizeState(doc);
+    const cardIds = {};
+    this.state.cards.forEach(function (c) { cardIds[c.id] = true; });
+    remote.cards.forEach((c) => {
+      if (!cardIds[c.id]) {
+        this.state.cards.push(c);
+        cardIds[c.id] = true;
+      }
+    });
+    if (this.state.cards.length > MAX_POOL) this.state.cards.length = MAX_POOL;
+
+    const keys = {};
+    this.state.history.forEach(function (h) { keys[h.key] = true; });
+    const extra = remote.history.filter(function (h) { return !keys[h.key]; });
+    if (extra.length) {
+      this.state.history = this.state.history.concat(extra)
+        .sort(function (a, b) { return (b.at || 0) - (a.at || 0); })
+        .slice(0, 200);
+    }
+
+    this.state.remaining = this.validRemaining();
+    this.state.updatedAt = Date.now();
+    this.refresh();
+    this.persistLocal();
+  },
+
+  /* 冷启动恢复最近一次抽卡留下的未完成任务，保持抽卡锁与文档规则一致 */
+  restorePending() {
+    const history = this.state.history || [];
+    let latestAt = 0;
+    history.forEach(function (h) {
+      if ((h.at || 0) > latestAt) latestAt = h.at;
+    });
+
+    if (!latestAt) {
+      this.pending = [];
+      return;
+    }
+
+    this.pending = history.filter(function (h) {
+      return h.at === latestAt && !h.done;
+    }).map(function (h) {
+      return { title: h.title, text: h.text, record: h };
+    });
   },
 
   scheduleCloudSave() {
@@ -388,8 +455,16 @@ Page({
     /* 串行写入，避免并发时旧数据覆盖新数据 */
     this.cloudChain = (this.cloudChain || Promise.resolve())
       .then(write)
-      .catch(() => { this.notifyCloudError(); });
+      .catch((err) => {
+        this.logCloudError(err, 'write');
+        this.notifyCloudError();
+      });
     return this.cloudChain;
+  },
+
+  logCloudError(detail, action) {
+    const app = getApp();
+    if (app && app.logError) app.logError('cloudSync:' + action, detail);
   },
 
   notifyCloudError() {
@@ -434,6 +509,8 @@ Page({
     const name = e.currentTarget.dataset.view;
     if (name === this.data.view) return;
     this.setData({ view: name });
+    /* 列表数据按需加载：切到哪个视图才下发哪份列表 */
+    this.refresh(name);
     wx.pageScrollTo({ scrollTop: 0, duration: 200 });
   },
 
@@ -742,11 +819,12 @@ Page({
   },
 
   /* ---------- 状态 / 设置 ---------- */
-  refresh() {
+  refresh(view) {
     const remain = this.state.settings.noRepeat
       ? this.validRemaining().length
       : this.state.cards.length;
 
+    /* 只发状态栏小字段，列表按当前视图单独下发，避免每次交互重传整份卡池/记录 */
     this.setData({
       poolCount: this.state.cards.length,
       statRemain: remain,
@@ -755,13 +833,21 @@ Page({
         : this.roundDrawn,
       count: this.state.settings.count,
       noRepeat: this.state.settings.noRepeat,
-      pool: this.state.cards,
       hTotal: this.state.history.length,
-      hDone: this.state.history.filter(function (h) { return h.done; }).length,
-      history: this.buildHistoryView()
+      hDone: this.state.history.filter(function (h) { return h.done; }).length
     });
 
+    this.refreshList(view);
     this.updateDrawLock();
+  },
+
+  refreshList(view) {
+    const v = view || this.data.view;
+    if (v === 'pool') {
+      this.setData({ pool: this.state.cards });
+    } else if (v === 'history') {
+      this.setData({ history: this.buildHistoryView() });
+    }
   },
 
   buildHistoryView() {
@@ -928,7 +1014,11 @@ Page({
 
     h.done = !h.done;
     this.save();
-    this.refresh();
+    /* 只更新被点的那一条，不重传整份记录列表 */
+    this.setData({
+      ['history[' + idx + '].done']: h.done,
+      hDone: this.state.history.filter(function (x) { return x.done; }).length
+    });
     this.syncPending();
   },
 
@@ -951,6 +1041,10 @@ Page({
       success: (res) => {
         if (!res.confirm) return;
         this.state.history = [];
+        this.currentCards = [];
+        this.abortDraw();
+        this.clearPending();
+        this.syncStage();
         this.save();
         this.refresh();
         this.toast('记录已清空');
@@ -969,5 +1063,22 @@ Page({
 
   onMaskTap() {
     this.closeModal();
+  },
+
+  /* ---------- 分享 ---------- */
+  onShareAppMessage() {
+    const card = this.currentCards && this.currentCards[0];
+    return {
+      title: card
+        ? '我在 citywalk 抽到了「' + card.title + '」，你也来抽一张'
+        : 'citywalk · 任务抽卡｜周末散步抽一张',
+      path: '/pages/index/index'
+    };
+  },
+
+  onShareTimeline() {
+    return {
+      title: 'citywalk · 任务抽卡｜周末散步抽一张'
+    };
   }
 });
