@@ -1,0 +1,14 @@
+page {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: #fffcf4;
+  color: #4f3a28;
+  -webkit-tap-highlight-color: transparent;
+}
+
+view,
+text,
+input,
+textarea,
+image {
+  box-sizing: border-box;
+}

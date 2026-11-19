@@ -1,0 +1,214 @@
+<view class="app season-{{season}}">
+  <image class="bg-photo" src="{{bgSrc}}" mode="aspectFill"></image>
+  <view class="bg-veil"></view>
+  <view class="bg-noise"></view>
+
+  <view class="page" style="padding-top:{{navTop}}px">
+    <view class="head">
+      <view class="title">citywalk · 任务抽卡</view>
+      <view class="badge">卡池 {{poolCount}} 张</view>
+    </view>
+
+    <view class="tabs">
+      <view class="tab {{view === 'draw' ? 'active' : ''}}" data-view="draw" bindtap="onTab">抽卡</view>
+      <view class="tab {{view === 'pool' ? 'active' : ''}}" data-view="pool" bindtap="onTab">卡池</view>
+      <view class="tab {{view === 'history' ? 'active' : ''}}" data-view="history" bindtap="onTab">记录</view>
+    </view>
+
+    <!-- 抽卡 -->
+    <view class="view" wx:if="{{view === 'draw'}}">
+      <view class="status">
+        <text>本轮剩余 <text class="b">{{statRemain}}</text> 张</text>
+        <text>已抽 <text class="b">{{statDrawn}}</text> 张</text>
+      </view>
+
+      <view class="stage {{stageMode === 'shuffle' ? 'shuffling' : ''}}">
+        <block wx:if="{{stageMode === 'placeholder'}}">
+          <view class="placeholder">
+            <view class="ph-deck">
+              <view class="ph-sc ph-1"></view>
+              <view class="ph-sc ph-2"></view>
+              <view class="ph-sc ph-3">?</view>
+            </view>
+            <view>点击下方按钮，抽一张任务卡</view>
+            <view>抽到后点击卡面翻开</view>
+          </view>
+        </block>
+
+        <block wx:elif="{{stageMode === 'shuffle'}}">
+          <view class="shuffle-wrap">
+            <view class="shuffle-deck">
+              <view class="sc s1"></view>
+              <view class="sc s2"></view>
+              <view class="sc s3"></view>
+              <view class="sc s4"><text class="sc-q">?</text></view>
+            </view>
+            <view class="shuffle-tip">正在洗牌<text class="dots"><text class="dot d1"></text><text class="dot d2"></text><text class="dot d3"></text></text></view>
+          </view>
+        </block>
+
+        <block wx:else>
+          <view
+            class="card {{item.flipped ? 'flipped' : ''}}"
+            wx:for="{{currentCards}}"
+            wx:key="id"
+            style="animation-delay:{{index * 70}}ms"
+            data-i="{{index}}"
+            bindtap="onFlip"
+          >
+            <view class="card-spacer"></view>
+            <view class="card-inner">
+              <view class="card-face card-back">
+                <view class="back-tag">任务</view>
+                <view class="back-title">{{item.title}}</view>
+                <view class="back-sub">CITY WALK</view>
+              </view>
+              <view class="card-face card-front">
+                <view class="card-no">No.{{item.no}}</view>
+                <view class="card-title">{{item.title}}</view>
+                <view class="card-text">{{item.text}}</view>
+                <view class="card-mark">TASK</view>
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+
+      <view class="actions">
+        <view class="btn btn-primary {{drawLocked ? 'is-locked' : ''}}" hover-class="btn-tap" hover-stay-time="80" bindtap="onDraw">{{drawBtnText}}</view>
+        <view class="btn" wx:if="{{showFlipAll}}" hover-class="btn-tap" hover-stay-time="80" bindtap="onFlipAll">全部翻开</view>
+        <view class="btn btn-ghost" hover-class="btn-tap" hover-stay-time="80" bindtap="onResetRound">重置本轮进度</view>
+      </view>
+
+      <view class="panel panel-mt">
+        <view class="row">
+          <view class="label">每次抽取<view class="sub">一次抽几张卡</view></view>
+          <view class="seg">
+            <view
+              class="seg-btn {{count === item ? 'on' : ''}}"
+              wx:for="{{countOptions}}"
+              wx:key="*this"
+              data-n="{{item}}"
+              bindtap="onCount"
+            >{{item}}</view>
+          </view>
+        </view>
+        <view class="row row-line">
+          <view class="label">不重复抽取<view class="sub">抽完一轮自动洗牌</view></view>
+          <view class="switch {{noRepeat ? 'on' : ''}}" bindtap="onToggleRepeat"></view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 卡池 -->
+    <view class="view" wx:if="{{view === 'pool'}}">
+      <view class="count-tip">当前卡池共 <text class="b">{{poolCount}}</text> 张任务卡</view>
+
+      <view class="panel">
+        <input
+          class="input"
+          model:value="{{inputTitle}}"
+          placeholder="小标题，如：最小门店"
+          placeholder-class="input-ph"
+          maxlength="12"
+          confirm-type="done"
+          bindconfirm="onAddOne"
+        />
+        <view class="gap-8"></view>
+        <input
+          class="input"
+          model:value="{{inputText}}"
+          placeholder="任务内容，如：找到一家门面最小的店，进去买一样东西"
+          placeholder-class="input-ph"
+          maxlength="60"
+          confirm-type="done"
+          bindconfirm="onAddOne"
+        />
+        <view class="gap-10"></view>
+        <view class="btn btn-block" hover-class="btn-tap" hover-stay-time="80" bindtap="onAddOne">添加到卡池</view>
+        <view class="gap-12"></view>
+        <textarea
+          class="input textarea"
+          model:value="{{inputBatch}}"
+          placeholder="批量导入：每行一条，格式「小标题|任务内容」"
+          placeholder-class="input-ph"
+          maxlength="-1"
+        ></textarea>
+        <view class="hint">没有竖线时，自动取前 6 个字作标题</view>
+        <view class="gap-10"></view>
+        <view class="inline">
+          <view class="btn btn-flex" hover-class="btn-tap" hover-stay-time="80" bindtap="onImport">批量导入</view>
+          <view class="btn btn-flex" hover-class="btn-tap" hover-stay-time="80" bindtap="onRestore">恢复默认</view>
+          <view class="btn btn-flex" hover-class="btn-tap" hover-stay-time="80" bindtap="onClearPool">清空</view>
+        </view>
+      </view>
+
+      <view class="list" wx:if="{{pool.length}}">
+        <view class="pool-item" wx:for="{{pool}}" wx:key="id">
+          <text class="pool-idx">{{index + 1}}</text>
+          <view class="pool-body">
+            <view class="pool-title">{{item.title}}</view>
+            <view class="pool-text">{{item.text}}</view>
+          </view>
+          <view class="del" data-id="{{item.id}}" catchtap="onPoolDel">×</view>
+        </view>
+      </view>
+      <view class="empty" wx:else>卡池是空的，先添加几条任务吧</view>
+    </view>
+
+    <!-- 记录 -->
+    <view class="view" wx:if="{{view === 'history'}}">
+      <view class="count-tip">已抽 <text class="b">{{hTotal}}</text> 张 · 完成 <text class="b">{{hDone}}</text> 张 · 点击卡片标记完成</view>
+
+      <view class="list" wx:if="{{history.length}}">
+        <view
+          class="h-item {{item.done ? 'done' : ''}}"
+          wx:for="{{history}}"
+          wx:key="key"
+          data-idx="{{index}}"
+          bindtap="onHistoryToggle"
+        >
+          <view class="h-dot"></view>
+          <view class="h-body">
+            <view class="h-title">{{item.title}}</view>
+            <view class="h-text">{{item.text}}</view>
+            <text class="h-time">{{item.timeText}}</text>
+          </view>
+          <view class="del" data-idx="{{index}}" catchtap="onHistoryDel">×</view>
+        </view>
+      </view>
+      <view class="empty" wx:else>还没有抽卡记录</view>
+
+      <view class="actions actions-top">
+        <view class="btn btn-ghost" hover-class="btn-tap" hover-stay-time="80" bindtap="onClearHistory">清空记录</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 季节切换 -->
+  <view class="dock-mask" wx:if="{{dockOpen}}" bindtap="onCloseDock"></view>
+  <view class="season-dock">
+    <view class="seasons {{dockOpen ? 'open' : ''}}">
+      <view class="season {{season === 'spring' ? 'active' : ''}}" data-s="spring" bindtap="onSeason"><view class="dot dot-spring"></view>春</view>
+      <view class="season {{season === 'summer' ? 'active' : ''}}" data-s="summer" bindtap="onSeason"><view class="dot dot-summer"></view>夏</view>
+      <view class="season {{season === 'autumn' ? 'active' : ''}}" data-s="autumn" bindtap="onSeason"><view class="dot dot-autumn"></view>秋</view>
+      <view class="season {{season === 'winter' ? 'active' : ''}}" data-s="winter" bindtap="onSeason"><view class="dot dot-winter"></view>冬</view>
+    </view>
+    <view class="season-fab" hover-class="fab-tap" hover-stay-time="80" bindtap="onToggleDock">
+      <view class="fab-ring"></view>
+    </view>
+  </view>
+
+  <!-- 任务弹框 -->
+  <view class="modal-mask {{modalOpen ? 'show' : ''}}" bindtap="onMaskTap">
+    <view class="modal" catchtap="noop">
+      <view class="modal-tag">当前任务</view>
+      <view class="modal-title">{{modalTitle}}</view>
+      <view class="modal-text">{{modalText}}</view>
+      <view class="btn btn-primary" hover-class="btn-tap" hover-stay-time="80" bindtap="onModalDone">✓ 已完成，继续抽卡</view>
+      <view class="btn btn-ghost modal-later" hover-class="btn-tap" hover-stay-time="80" bindtap="onModalLater">先收起，稍后再做</view>
+    </view>
+  </view>
+
+  <view class="toast {{toastShow ? 'show' : ''}}">{{toastText}}</view>
+</view>
