@@ -18,7 +18,8 @@
     <!-- 抽卡 -->
     <view class="view" wx:if="{{view === 'draw'}}">
       <view class="status">
-        <text>本轮剩余 <text class="b">{{statRemain}}</text> 张</text>
+        <text wx:if="{{noRepeat}}">本轮剩余 <text class="b">{{statRemain}}</text> 张</text>
+        <text wx:else>卡池共 <text class="b">{{statRemain}}</text> 张</text>
         <text>已抽 <text class="b">{{statDrawn}}</text> 张</text>
       </view>
 
@@ -57,7 +58,7 @@
             bindtap="onFlip"
           >
             <view class="card-spacer"></view>
-            <view class="card-inner">
+            <view class="card-inner" style="transition-delay:{{item.delay}}ms">
               <view class="card-face card-back">
                 <view class="back-tag">任务</view>
                 <view class="back-title">{{item.title}}</view>
@@ -134,7 +135,7 @@
           placeholder-class="input-ph"
           maxlength="-1"
         ></textarea>
-        <view class="hint">没有竖线时，自动取前 6 个字作标题</view>
+        <view class="hint">没有竖线时，自动取前 6 个字作标题；单次最多导入 100 条</view>
         <view class="gap-10"></view>
         <view class="inline">
           <view class="btn btn-flex" hover-class="btn-tap" hover-stay-time="80" bindtap="onImport">批量导入</view>

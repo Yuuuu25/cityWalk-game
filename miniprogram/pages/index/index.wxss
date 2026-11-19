@@ -636,6 +636,7 @@ page {
   right: 0;
   bottom: 0;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
   transition: transform .62s cubic-bezier(.2, .85, .25, 1);
 }
 
@@ -893,7 +894,7 @@ page {
   top: 0;
   right: 0;
   bottom: 0;
-  z-index: 60;
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: center;

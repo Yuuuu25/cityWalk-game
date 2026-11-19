@@ -1,6 +1,5 @@
 const STORE_KEY = 'citywalk.draw.v1';
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
-const THEME_COLOR = { spring: '#fffafd', summer: '#f9fffb', autumn: '#fffcf4', winter: '#f9fcff' };
 const BG_SRC = {
   spring: '/assets/spring.jpg',
   summer: '/assets/summer.jpg',
@@ -8,8 +7,15 @@ const BG_SRC = {
   winter: '/assets/winter.jpg'
 };
 
+const MAX_POOL = 300;
+const MAX_IMPORT = 100;
+
+/* 云开发数据库集合与同步参数 */
+const CLOUD_COLLECTION = 'citywalk_states';
+const CLOUD_SAVE_DELAY = 800;
+
 const DEFAULT_TASKS = [
-  ['晒太阳的人', '找到一个正在晒太阳的人并给它拍照'],
+  ['晒太阳的人', '找到一个正在晒太阳的人并给其拍照'],
   ['收集落叶', '收集三片不同的落叶'],
   ['搭话老板', '和一位店老板聊满三句话'],
   ['对称构图', '拍一张"对称"构图的照片'],
@@ -62,24 +68,20 @@ function vibrate() {
   } catch (e) {}
 }
 
-function loadState() {
-  const fallback = {
-    cards: makeDefaultCards(),
+function fallbackState() {
+  const cards = makeDefaultCards();
+  return {
+    cards: cards,
     settings: { count: 1, noRepeat: true, season: currentSeason() },
-    remaining: [],
-    history: []
+    remaining: cards.map(function (c) { return c.id; }),
+    history: [],
+    updatedAt: 0
   };
+}
 
-  let raw;
-  try {
-    raw = wx.getStorageSync(STORE_KEY);
-  } catch (e) {
-    return { state: fallback, readOK: false };
-  }
-
-  if (!raw || typeof raw !== 'object') {
-    return { state: fallback, readOK: true };
-  }
+function normalizeState(raw) {
+  const fallback = fallbackState();
+  if (!raw || typeof raw !== 'object') return fallback;
 
   try {
     const cards = Array.isArray(raw.cards) ? raw.cards.filter(function (c) {
@@ -90,10 +92,10 @@ function loadState() {
         title: (typeof c.title === 'string' && c.title.trim()) ? c.title.trim() : shortTitle(c.text),
         text: c.text
       };
-    }) : fallback.cards;
+    }).slice(0, MAX_POOL) : fallback.cards;
 
     const settings = {
-      count: Math.min(8, Math.max(1, parseInt(raw.settings && raw.settings.count, 10) || 1)),
+      count: Math.min(5, Math.max(1, parseInt(raw.settings && raw.settings.count, 10) || 1)),
       noRepeat: !(raw.settings && raw.settings.noRepeat === false),
       season: currentSeason()
     };
@@ -114,17 +116,25 @@ function loadState() {
     }) : [];
 
     return {
-      state: {
-        cards: cards,
-        settings: settings,
-        remaining: remaining === null ? cards.map(function (c) { return c.id; }) : remaining,
-        history: history
-      },
-      readOK: true
+      cards: cards,
+      settings: settings,
+      remaining: remaining === null ? cards.map(function (c) { return c.id; }) : remaining,
+      history: history,
+      updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : 0
     };
   } catch (e) {
-    return { state: fallback, readOK: true };
+    return fallback;
   }
+}
+
+function loadState() {
+  let raw;
+  try {
+    raw = wx.getStorageSync(STORE_KEY);
+  } catch (e) {
+    return { state: fallbackState(), readOK: false };
+  }
+  return { state: normalizeState(raw), readOK: true };
 }
 
 Page({
@@ -167,12 +177,20 @@ Page({
     this.storageOK = loaded.readOK;
     this.currentCards = [];
     this.pending = [];
+    this.roundDrawn = 0;
     this.modalVisible = false;
     this.drawing = false;
     this.drawTimer = null;
     this.modalTimer = null;
     this.toastTimer = null;
     this.dockTimer = null;
+
+    /* 云端同步状态：pending 拉取中 / ready 可用 / off 未启用或不可用 */
+    this.cloudStatus = 'off';
+    this.cloudDocId = '';
+    this.cloudTimer = null;
+    this.cloudChain = null;
+    this.cloudNotified = false;
 
     let statusBarHeight = 20;
     try {
@@ -189,7 +207,8 @@ Page({
     this.applySeason(this.state.settings.season);
     this.refresh();
     this.syncStage();
-    this.save();
+    this.persistLocal();
+    this.syncFromCloud();
 
     if (!this.storageOK) {
       setTimeout(() => this.toast('本地存储不可用，本次数据不会保存'), 800);
@@ -198,6 +217,7 @@ Page({
 
   onHide() {
     this.abortDraw();
+    this.flushCloudSave();
     if (this.toastTimer) {
       clearTimeout(this.toastTimer);
       this.toastTimer = null;
@@ -209,10 +229,16 @@ Page({
     if (this.modalTimer) {
       clearTimeout(this.modalTimer);
       this.modalTimer = null;
+      /* 弹框还没弹出就被切走：允许回到前台后点抽卡重新弹出 */
+      this.modalVisible = false;
+    }
+    if (this.data.toastShow || this.data.dockOpen) {
+      this.setData({ toastShow: false, dockOpen: false });
     }
   },
 
   onUnload() {
+    this.flushCloudSave();
     if (this.drawTimer) {
       clearTimeout(this.drawTimer);
       this.drawTimer = null;
@@ -234,13 +260,14 @@ Page({
   noop() {},
 
   /* ---------- 存储 ---------- */
-  save() {
+  persistLocal() {
     try {
       wx.setStorageSync(STORE_KEY, {
         cards: this.state.cards,
         settings: this.state.settings,
         remaining: this.state.remaining,
-        history: this.state.history
+        history: this.state.history,
+        updatedAt: this.state.updatedAt
       });
       this.storageOK = true;
     } catch (e) {
@@ -249,6 +276,126 @@ Page({
         this.toast('本地存储不可用，数据不会保存');
       }
     }
+  },
+
+  save() {
+    this.state.updatedAt = Date.now();
+    this.persistLocal();
+    this.scheduleCloudSave();
+  },
+
+  /* ---------- 云端同步（微信云开发） ---------- */
+  cloudDB() {
+    const app = getApp();
+    if (!wx.cloud || !app || !app.globalData.cloudReady) return null;
+    try {
+      return wx.cloud.database();
+    } catch (e) {
+      return null;
+    }
+  },
+
+  syncFromCloud() {
+    const db = this.cloudDB();
+    if (!db) {
+      this.cloudStatus = 'off';
+      return;
+    }
+
+    this.cloudStatus = 'pending';
+    db.collection(CLOUD_COLLECTION).orderBy('updatedAt', 'desc').limit(1).get()
+      .then((res) => {
+        this.cloudStatus = 'ready';
+        const doc = res.data && res.data[0];
+        if (!doc) {
+          /* 云端还没有记录：把本地数据作为初始副本上传 */
+          this.pushToCloud();
+          return;
+        }
+
+        this.cloudDocId = doc._id;
+        const remoteAt = doc.updatedAt || 0;
+        const localAt = this.state.updatedAt || 0;
+
+        if (remoteAt > localAt) {
+          /* 正在抽卡/翻牌时不覆盖，避免打断当前操作 */
+          if (this.drawing || this.pending.length || this.currentCards.length) {
+            this.pushToCloud();
+          } else {
+            this.applyRemoteState(doc);
+          }
+        } else if (localAt > remoteAt) {
+          this.pushToCloud();
+        }
+      })
+      .catch(() => {
+        this.cloudStatus = 'off';
+        this.notifyCloudError();
+      });
+  },
+
+  applyRemoteState(doc) {
+    const next = normalizeState(doc);
+    this.state = next;
+    this.state.remaining = this.validRemaining();
+    this.roundDrawn = 0;
+    this.currentCards = [];
+    this.pending = [];
+    this.modalVisible = false;
+    this.applySeason(this.state.settings.season);
+    this.syncStage();
+    this.refresh();
+    this.persistLocal();
+  },
+
+  scheduleCloudSave() {
+    if (this.cloudStatus !== 'ready') return;
+    if (this.cloudTimer) clearTimeout(this.cloudTimer);
+    this.cloudTimer = setTimeout(() => {
+      this.cloudTimer = null;
+      this.pushToCloud();
+    }, CLOUD_SAVE_DELAY);
+  },
+
+  flushCloudSave() {
+    if (this.cloudTimer) {
+      clearTimeout(this.cloudTimer);
+      this.cloudTimer = null;
+      this.pushToCloud();
+    }
+  },
+
+  pushToCloud() {
+    if (this.cloudStatus !== 'ready') return Promise.resolve();
+    const db = this.cloudDB();
+    if (!db) return Promise.resolve();
+    if (!this.state.updatedAt) this.state.updatedAt = Date.now();
+
+    const col = db.collection(CLOUD_COLLECTION);
+    const write = () => {
+      const data = {
+        cards: this.state.cards,
+        settings: this.state.settings,
+        remaining: this.state.remaining,
+        history: this.state.history,
+        updatedAt: this.state.updatedAt
+      };
+      return this.cloudDocId
+        ? col.doc(this.cloudDocId).update({ data: data })
+        : col.add({ data: data }).then((res) => { this.cloudDocId = res._id; });
+    };
+
+    /* 串行写入，避免并发时旧数据覆盖新数据 */
+    this.cloudChain = (this.cloudChain || Promise.resolve())
+      .then(write)
+      .catch(() => { this.notifyCloudError(); });
+    return this.cloudChain;
+  },
+
+  notifyCloudError() {
+    if (this.cloudNotified) return;
+    this.cloudNotified = true;
+    this.toast('云端同步失败，数据已保存在本地');
   },
 
   cardOf(id) {
@@ -281,13 +428,6 @@ Page({
     if (SEASONS.indexOf(s) === -1) s = 'autumn';
     this.state.settings.season = s;
     this.setData({ season: s, bgSrc: BG_SRC[s] });
-    try {
-      wx.setNavigationBarColor({
-        frontColor: '#000000',
-        backgroundColor: THEME_COLOR[s],
-        fail: function () {}
-      });
-    } catch (e) {}
   },
 
   onTab(e) {
@@ -365,7 +505,7 @@ Page({
     this.setData({ drawLocked: locked, drawBtnText: text });
   },
 
-  enqueuePending(card) {
+  enqueuePending(card, extraDelay) {
     if (!card || this.pending.indexOf(card) !== -1 || card.record.done) return;
     this.pending.push(card);
     this.updateDrawLock();
@@ -377,7 +517,7 @@ Page({
         if (!this.modalVisible) return;
         this.modalVisible = false;
         this.showModal();
-      }, 520);
+      }, 700 + (extraDelay || 0));
     }
   },
 
@@ -425,7 +565,10 @@ Page({
 
   /* ---------- 抽卡 ---------- */
   onDraw() {
-    if (this.drawing) return;
+    if (this.drawing) {
+      this.toast('正在洗牌，稍等一下');
+      return;
+    }
 
     if (this.pending.length) {
       if (!this.modalVisible) this.showModal();
@@ -497,6 +640,7 @@ Page({
 
     records.forEach((r) => { this.state.history.unshift(r); });
     if (this.state.history.length > 200) this.state.history.length = 200;
+    this.roundDrawn += records.length;
 
     this.currentCards = records.map(function (r, i) {
       return {
@@ -504,7 +648,8 @@ Page({
         title: r.title,
         text: r.text,
         flipped: false,
-        no: String(i + 1).padStart(2, '0'),
+        no: (i + 1) < 10 ? '0' + (i + 1) : '' + (i + 1),
+        delay: 0,
         record: r
       };
     });
@@ -524,12 +669,13 @@ Page({
     if (this.drawing) {
       this.drawing = false;
       this.syncStage();
+      this.updateDrawLock();
     }
   },
 
   syncStage() {
     const cards = this.currentCards.map(function (c) {
-      return { id: c.id, title: c.title, text: c.text, flipped: c.flipped, no: c.no };
+      return { id: c.id, title: c.title, text: c.text, flipped: c.flipped, no: c.no, delay: c.delay || 0 };
     });
     this.setData({
       stageMode: cards.length ? 'cards' : 'placeholder',
@@ -563,18 +709,28 @@ Page({
     const toQueue = this.currentCards.filter(function (c) { return !c.flipped; });
     if (!toQueue.length) return;
 
+    /* 依次错峰翻开，每张间隔 70ms */
+    const stagger = 70;
     const patch = {};
-    this.currentCards.forEach(function (c, i) {
+    toQueue.forEach(function (c, i) {
       c.flipped = true;
+      c.delay = i * stagger;
+    });
+    this.currentCards.forEach(function (c, i) {
       patch['currentCards[' + i + '].flipped'] = true;
+      patch['currentCards[' + i + '].delay'] = c.delay || 0;
     });
     this.setData(patch);
     this.updateFlipBtn();
     vibrate();
-    toQueue.forEach((c) => this.enqueuePending(c));
+
+    /* 弹框等最后一张翻完再出现 */
+    const extra = (toQueue.length - 1) * stagger;
+    toQueue.forEach((c, i) => this.enqueuePending(c, i === 0 ? extra : 0));
   },
 
   onResetRound() {
+    this.roundDrawn = 0;
     this.state.remaining = this.state.cards.map(function (c) { return c.id; });
     this.currentCards = [];
     this.abortDraw();
@@ -594,7 +750,9 @@ Page({
     this.setData({
       poolCount: this.state.cards.length,
       statRemain: remain,
-      statDrawn: Math.max(0, this.state.cards.length - remain),
+      statDrawn: this.state.settings.noRepeat
+        ? Math.max(0, this.state.cards.length - remain)
+        : this.roundDrawn,
       count: this.state.settings.count,
       noRepeat: this.state.settings.noRepeat,
       pool: this.state.cards,
@@ -626,6 +784,10 @@ Page({
 
   onToggleRepeat() {
     const settings = this.state.settings;
+    if (settings.noRepeat) {
+      /* 关闭不重复前，把本轮已抽数量记下来，切换后继续显示 */
+      this.roundDrawn = Math.max(0, this.state.cards.length - this.validRemaining().length);
+    }
     settings.noRepeat = !settings.noRepeat;
     if (settings.noRepeat) this.state.remaining = this.validRemaining();
     this.save();
@@ -638,6 +800,11 @@ Page({
     let text = String(this.data.inputText || '').trim();
     if (!text) {
       this.toast('请输入任务内容');
+      return;
+    }
+
+    if (this.state.cards.length >= MAX_POOL) {
+      this.toast('卡池最多 ' + MAX_POOL + ' 张，请先删除一些');
       return;
     }
 
@@ -665,8 +832,15 @@ Page({
       return;
     }
 
+    const room = MAX_POOL - this.state.cards.length;
+    if (room <= 0) {
+      this.toast('卡池已满 ' + MAX_POOL + ' 张，请先删除一些');
+      return;
+    }
+
+    const limit = Math.min(lines.length, room, MAX_IMPORT);
     let added = 0;
-    lines.forEach((line) => {
+    lines.slice(0, limit).forEach((line) => {
       const parts = line.split('|');
       let title = '';
       let text = line;
@@ -691,7 +865,13 @@ Page({
     this.setData({ inputBatch: '' });
     this.save();
     this.refresh();
-    this.toast('已导入 ' + added + ' 张');
+
+    const skipped = lines.length - limit;
+    if (skipped > 0) {
+      this.toast('已导入 ' + added + ' 张，' + skipped + ' 条超出上限未导入');
+    } else {
+      this.toast('已导入 ' + added + ' 张');
+    }
   },
 
   onPoolDel(e) {
