@@ -807,15 +807,23 @@ Page({
   },
 
   onResetRound() {
-    this.roundDrawn = 0;
-    this.state.remaining = this.state.cards.map(function (c) { return c.id; });
-    this.currentCards = [];
-    this.abortDraw();
-    this.clearPending();
-    this.syncStage();
-    this.save();
-    this.refresh();
-    this.toast('本轮进度已重置');
+    wx.showModal({
+      title: '重置本轮',
+      content: '将清空本轮抽卡记录和未完成任务，确定重新开始吗？',
+      success: (res) => {
+        if (!res.confirm) return;
+        this.roundDrawn = 0;
+        this.state.remaining = this.state.cards.map(function (c) { return c.id; });
+        this.state.history = [];
+        this.currentCards = [];
+        this.abortDraw();
+        this.clearPending();
+        this.syncStage();
+        this.save();
+        this.refresh();
+        this.toast('本轮已重置');
+      }
+    });
   },
 
   /* ---------- 状态 / 设置 ---------- */

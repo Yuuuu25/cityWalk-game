@@ -419,14 +419,17 @@
   }
 
   function resetRound() {
+    if (!confirm('重新开始本轮？将清空本轮抽卡记录和未完成任务。')) return;
     state.remaining = state.cards.map(function (c) { return c.id; });
+    state.history = [];
     currentCards = [];
     abortDraw();
     clearPending();
     save();
     renderStage();
     renderStats();
-    toast('本轮进度已重置');
+    renderHistory();
+    toast('本轮已重置');
   }
 
   /* ---------- 状态 / 设置 ---------- */
