@@ -285,11 +285,19 @@ page {
 
 /* 顶部 */
 .head {
+  position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.head-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
 .title {
@@ -315,22 +323,16 @@ page {
   box-shadow: 0 2px 8px var(--shadow-2);
 }
 
-/* 季节切换浮标 */
+/* 季节切换：跟随标题，点开后在标题下方展开 */
 .season-dock {
-  position: fixed;
-  right: 16px;
-  bottom: 18px;
-  bottom: calc(18px + env(safe-area-inset-bottom));
-  z-index: 80;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  align-items: center;
+  flex: none;
 }
 
 .season-fab {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--panel);
@@ -346,8 +348,8 @@ page {
 }
 
 .fab-ring {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: linear-gradient(135deg, #f27fa5, #4ac295 40%, #f59a4f 70%, #5aabe8);
   background: conic-gradient(#f27fa5 0 25%, #4ac295 0 50%, #f59a4f 0 75%, #5aabe8 0 100%);
@@ -365,15 +367,19 @@ page {
 }
 
 .seasons {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 90;
   display: flex;
   gap: 6px;
   justify-content: flex-end;
   flex-wrap: wrap;
-  max-width: calc(100vw - 40px);
-  transform-origin: bottom right;
+  max-width: calc(100vw - 32px);
+  transform-origin: top right;
   transition: opacity .22s ease, transform .22s ease, visibility .22s;
   opacity: 0;
-  transform: translateY(6px) scale(.94);
+  transform: translateY(-6px) scale(.96);
   pointer-events: none;
   visibility: hidden;
 }

@@ -4,8 +4,23 @@
   <view class="bg-noise"></view>
 
   <view class="page" style="padding-top:{{navTop}}px">
+    <view class="dock-mask" wx:if="{{dockOpen}}" bindtap="onCloseDock"></view>
+
     <view class="head">
-      <view class="title">citywalk · 任务抽卡</view>
+      <view class="head-main">
+        <view class="title">四季散步任务卡</view>
+        <view class="season-dock">
+          <view class="seasons {{dockOpen ? 'open' : ''}}">
+            <view class="season {{season === 'spring' ? 'active' : ''}}" data-s="spring" bindtap="onSeason"><view class="dot dot-spring"></view>春</view>
+            <view class="season {{season === 'summer' ? 'active' : ''}}" data-s="summer" bindtap="onSeason"><view class="dot dot-summer"></view>夏</view>
+            <view class="season {{season === 'autumn' ? 'active' : ''}}" data-s="autumn" bindtap="onSeason"><view class="dot dot-autumn"></view>秋</view>
+            <view class="season {{season === 'winter' ? 'active' : ''}}" data-s="winter" bindtap="onSeason"><view class="dot dot-winter"></view>冬</view>
+          </view>
+          <view class="season-fab" hover-class="fab-tap" hover-stay-time="80" bindtap="onToggleDock">
+            <view class="fab-ring"></view>
+          </view>
+        </view>
+      </view>
       <view class="badge">卡池 {{poolCount}} 张</view>
     </view>
 
@@ -183,20 +198,6 @@
       <view class="actions actions-top">
         <view class="btn btn-ghost" hover-class="btn-tap" hover-stay-time="80" bindtap="onClearHistory">清空记录</view>
       </view>
-    </view>
-  </view>
-
-  <!-- 季节切换 -->
-  <view class="dock-mask" wx:if="{{dockOpen}}" bindtap="onCloseDock"></view>
-  <view class="season-dock">
-    <view class="seasons {{dockOpen ? 'open' : ''}}">
-      <view class="season {{season === 'spring' ? 'active' : ''}}" data-s="spring" bindtap="onSeason"><view class="dot dot-spring"></view>春</view>
-      <view class="season {{season === 'summer' ? 'active' : ''}}" data-s="summer" bindtap="onSeason"><view class="dot dot-summer"></view>夏</view>
-      <view class="season {{season === 'autumn' ? 'active' : ''}}" data-s="autumn" bindtap="onSeason"><view class="dot dot-autumn"></view>秋</view>
-      <view class="season {{season === 'winter' ? 'active' : ''}}" data-s="winter" bindtap="onSeason"><view class="dot dot-winter"></view>冬</view>
-    </view>
-    <view class="season-fab" hover-class="fab-tap" hover-stay-time="80" bindtap="onToggleDock">
-      <view class="fab-ring"></view>
     </view>
   </view>
 

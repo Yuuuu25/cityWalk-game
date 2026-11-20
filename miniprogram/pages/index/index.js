@@ -1071,14 +1071,14 @@ Page({
     return {
       title: card
         ? '我在 citywalk 抽到了「' + card.title + '」，你也来抽一张'
-        : 'citywalk · 任务抽卡｜周末散步抽一张',
+        : '四季散步任务卡｜周末散步抽一张',
       path: '/pages/index/index'
     };
   },
 
   onShareTimeline() {
     return {
-      title: 'citywalk · 任务抽卡｜周末散步抽一张'
+      title: '四季散步任务卡｜周末散步抽一张'
     };
   }
 });
