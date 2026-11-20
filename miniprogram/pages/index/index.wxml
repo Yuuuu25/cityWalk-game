@@ -45,7 +45,7 @@
               <view class="sc s1"></view>
               <view class="sc s2"></view>
               <view class="sc s3"></view>
-              <view class="sc s4"><view class="back-title">任务卡</view></view>
+              <view class="sc s4"><view class="deck-title">任务卡</view></view>
             </view>
             <view>点击下方按钮，抽一张任务卡</view>
             <view>抽到后点击卡面翻开</view>
@@ -58,7 +58,7 @@
               <view class="sc s1"></view>
               <view class="sc s2"></view>
               <view class="sc s3"></view>
-              <view class="sc s4"><view class="back-title">任务卡</view></view>
+              <view class="sc s4"><text class="sc-q">?</text></view>
             </view>
             <view class="shuffle-tip">正在洗牌<text class="dots"><text class="dot d1"></text><text class="dot d2"></text><text class="dot d3"></text></text></view>
           </view>
@@ -76,7 +76,9 @@
             <view class="card-spacer"></view>
             <view class="card-inner" style="transition-delay:{{item.delay}}ms">
               <view class="card-face card-back">
-                <view class="back-title">任务卡</view>
+                <view class="back-tag">任务</view>
+                <view class="back-title">{{item.title}}</view>
+                <view class="back-sub">CITY WALK</view>
               </view>
               <view class="card-face card-front">
                 <view class="card-no">No.{{item.no}}</view>

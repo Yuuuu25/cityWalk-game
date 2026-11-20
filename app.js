@@ -4,7 +4,7 @@
   var STORE_KEY = 'citywalk.draw.v1';
 
   /* 通关页引流文案：把小程序名称改成你自己的即可 */
-  var PROMO_TEXT = '微信搜索小程序「四季散步任务卡」，解锁完整任务库';
+  var PROMO_TEXT = '微信搜索小程序「四季散步任务卡」，解锁完整功能';
 
   var SEASONS = ['spring', 'summer', 'autumn', 'winter'];
   var THEME_COLOR = { spring: '#fffafd', summer: '#f9fffb', autumn: '#fffcf4', winter: '#f9fcff' };
@@ -309,7 +309,7 @@
           '<div class="sc s1"></div>' +
           '<div class="sc s2"></div>' +
           '<div class="sc s3"></div>' +
-          '<div class="sc s4"><div class="back-title">任务卡</div></div>' +
+          '<div class="sc s4"><span class="sc-q">?</span></div>' +
         '</div>' +
         '<div class="shuffle-tip">正在洗牌<span class="dots"><i></i><i></i><i></i></span></div>' +
       '</div>';
@@ -367,7 +367,7 @@
         '<div class="sc s1"></div>' +
         '<div class="sc s2"></div>' +
         '<div class="sc s3"></div>' +
-        '<div class="sc s4"><div class="back-title">任务卡</div></div>' +
+        '<div class="sc s4"><div class="deck-title">任务卡</div></div>' +
         '</div>点击下方按钮，抽一张任务卡<br>抽到后点击卡面翻开';
       stage.appendChild(ph);
       updateFlipBtn();
@@ -381,7 +381,9 @@
       el.innerHTML =
         '<div class="card-inner">' +
           '<div class="card-face card-back">' +
-            '<div class="back-title">任务卡</div>' +
+            '<span class="back-tag">任务</span>' +
+            '<div class="back-title">' + esc(c.title) + '</div>' +
+            '<span class="back-sub">CITY WALK</span>' +
           '</div>' +
           '<div class="card-face card-front">' +
             '<span class="card-no">No.' + String(i + 1).padStart(2, '0') + '</span>' +
