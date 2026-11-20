@@ -582,14 +582,6 @@ page {
   animation: shuffleTop .7s ease-in-out infinite alternate;
 }
 
-.sc-q {
-  font-size: 42px;
-  font-weight: 800;
-  color: var(--back-title);
-  line-height: 1;
-  text-shadow: 0 0 20px rgba(255, 255, 255, .7);
-}
-
 @keyframes shuffleL {
   from { transform: translate(-26px, 6px) rotate(-13deg); }
   to { transform: translate(-14px, 0) rotate(-5deg); }
@@ -702,30 +694,15 @@ page {
   pointer-events: none;
 }
 
-.back-tag {
-  font-size: 9px;
-  letter-spacing: 3px;
-  color: var(--back-tag);
-  border: 1px solid var(--back-tag-line);
-  border-radius: 999px;
-  padding: 2px 9px;
-  line-height: 1.4;
-}
-
 .back-title {
-  font-size: 19px;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: 22px;
   font-weight: 800;
   color: var(--back-title);
-  line-height: 1.3;
-  text-align: center;
-  word-break: break-word;
+  letter-spacing: 8px;
+  line-height: 1;
   text-shadow: 0 2px 12px var(--back-shadow);
-}
-
-.back-sub {
-  font-size: 9px;
-  letter-spacing: 3px;
-  color: var(--back-tag);
 }
 
 .card-front {
@@ -780,43 +757,28 @@ page {
   line-height: 2;
 }
 
-.ph-deck {
-  position: relative;
-  width: 64px;
-  height: 82px;
-  margin: 0 auto 12px;
+/* 未开始：洗牌卡组的静态形态（无动画、无问号） */
+.shuffle-deck.is-static {
+  margin: 0 auto 22px;
 }
 
-.ph-sc {
-  position: absolute;
-  left: 4px;
-  top: 4px;
-  width: 56px;
-  height: 74px;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  box-shadow: 0 4px 12px var(--shadow-3);
+.shuffle-deck.is-static .s1 {
+  animation: none;
+  transform: translate(-26px, 6px) rotate(-13deg);
 }
 
-.ph-1 {
-  transform: translate(-8px, 3px) rotate(-8deg);
-  opacity: .5;
+.shuffle-deck.is-static .s2 {
+  animation: none;
+  transform: translate(-4px, -2px) rotate(-2deg);
 }
 
-.ph-2 {
-  transform: translate(8px, 3px) rotate(8deg);
-  opacity: .5;
+.shuffle-deck.is-static .s3 {
+  animation: none;
+  transform: translate(26px, 6px) rotate(13deg);
 }
 
-.ph-3 {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  font-size: 26px;
-  font-weight: 800;
-  background: linear-gradient(160deg, var(--front-1), var(--front-2));
+.shuffle-deck.is-static .s4 {
+  animation: none;
 }
 
 /* 主按钮 */

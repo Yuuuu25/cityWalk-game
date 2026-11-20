@@ -252,7 +252,7 @@
       radial-gradient(820px 720px at 50% 112%, var(--glow-3), transparent 62%),
       linear-gradient(180deg,var(--bg-1),var(--bg-2) 55%,var(--bg-3));
     min-height:100vh;
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    padding:0 0 env(safe-area-inset-bottom);
     overflow-x:hidden;
   }
   /* 背景照片层（上方叠加奶油色遮罩保证文字对比） */
@@ -267,7 +267,8 @@
   body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
     background-image:var(--noise);background-size:160px 160px;
     opacity:.28;mix-blend-mode:multiply}
-  .app{position:relative;z-index:2;max-width:720px;margin:0 auto;padding:20px 16px 40px}
+  .app{position:relative;z-index:2;max-width:720px;margin:0 auto;
+    padding:calc(max(env(safe-area-inset-top,0px),46px) + 10px) 16px 40px}
 
   /* 顶部 */
   .head{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
@@ -366,8 +367,6 @@
   .shuffle-deck .s3{animation:shuffleR .5s ease-in-out infinite alternate}
   .shuffle-deck .s4{display:flex;align-items:center;justify-content:center;
     animation:shuffleTop .7s ease-in-out infinite alternate}
-  .sc-q{font-size:42px;font-weight:800;color:var(--back-title);line-height:1;
-    text-shadow:0 0 20px rgba(255,255,255,.7)}
   @keyframes shuffleL{from{transform:translate(-26px,6px) rotate(-13deg)}to{transform:translate(-14px,0) rotate(-5deg)}}
   @keyframes shuffleM{from{transform:translate(-4px,-2px) rotate(-2deg)}to{transform:translate(4px,2px) rotate(3deg)}}
   @keyframes shuffleR{from{transform:translate(26px,6px) rotate(13deg)}to{transform:translate(14px,0) rotate(5deg)}}
@@ -401,11 +400,9 @@
   }
   .card-back::after{content:"";position:absolute;inset:9px;border-radius:12px;
     border:1px dashed var(--back-tag-line);pointer-events:none}
-  .back-tag{font-size:9px;letter-spacing:3px;color:var(--back-tag);
-    border:1px solid var(--back-tag-line);border-radius:999px;padding:2px 9px;line-height:1.4}
-  .back-title{font-size:19px;font-weight:800;color:var(--back-title);line-height:1.3;
-    text-align:center;word-break:break-word;text-shadow:0 2px 12px var(--back-shadow)}
-  .back-sub{font-size:9px;letter-spacing:3px;color:var(--back-tag)}
+  .back-title{writing-mode:vertical-rl;text-orientation:upright;
+    font-size:22px;font-weight:800;color:var(--back-title);letter-spacing:8px;line-height:1;
+    text-shadow:0 2px 12px var(--back-shadow)}
 
   .card-front{
     transform:rotateY(180deg);justify-content:space-between;
@@ -421,7 +418,13 @@
   .card-mark{align-self:flex-end;font-size:10px;color:var(--card-mark);letter-spacing:2px}
 
   .placeholder{width:100%;text-align:center;color:var(--muted);font-size:13px;line-height:2}
-  .placeholder .big{font-size:40px;display:block;margin-bottom:6px;opacity:.55}
+
+  /* 未开始：洗牌卡组的静态形态（无动画、无问号） */
+  .shuffle-deck.is-static{margin:0 auto 22px}
+  .shuffle-deck.is-static .s1{animation:none;transform:translate(-26px,6px) rotate(-13deg)}
+  .shuffle-deck.is-static .s2{animation:none;transform:translate(-4px,-2px) rotate(-2deg)}
+  .shuffle-deck.is-static .s3{animation:none;transform:translate(26px,6px) rotate(13deg)}
+  .shuffle-deck.is-static .s4{animation:none}
 
   /* 主按钮 */
   .actions{display:flex;flex-direction:column;gap:10px;align-items:center}

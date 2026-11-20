@@ -309,7 +309,7 @@
           '<div class="sc s1"></div>' +
           '<div class="sc s2"></div>' +
           '<div class="sc s3"></div>' +
-          '<div class="sc s4"><span class="sc-q">?</span></div>' +
+          '<div class="sc s4"><div class="back-title">任务卡</div></div>' +
         '</div>' +
         '<div class="shuffle-tip">正在洗牌<span class="dots"><i></i><i></i><i></i></span></div>' +
       '</div>';
@@ -363,7 +363,12 @@
     if (currentCards.length === 0) {
       var ph = document.createElement('div');
       ph.className = 'placeholder';
-      ph.innerHTML = '<span class="big">🎴</span>点击下方按钮，抽一张任务卡<br>抽到后点击卡面翻开';
+      ph.innerHTML = '<div class="shuffle-deck is-static">' +
+        '<div class="sc s1"></div>' +
+        '<div class="sc s2"></div>' +
+        '<div class="sc s3"></div>' +
+        '<div class="sc s4"><div class="back-title">任务卡</div></div>' +
+        '</div>点击下方按钮，抽一张任务卡<br>抽到后点击卡面翻开';
       stage.appendChild(ph);
       updateFlipBtn();
       return;
@@ -376,9 +381,7 @@
       el.innerHTML =
         '<div class="card-inner">' +
           '<div class="card-face card-back">' +
-            '<span class="back-tag">任务</span>' +
-            '<div class="back-title">' + esc(c.title) + '</div>' +
-            '<span class="back-sub">CITY WALK</span>' +
+            '<div class="back-title">任务卡</div>' +
           '</div>' +
           '<div class="card-face card-front">' +
             '<span class="card-no">No.' + String(i + 1).padStart(2, '0') + '</span>' +
